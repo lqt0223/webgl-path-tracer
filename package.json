@@ -1,0 +1,12 @@
+{
+  "name": "webgl-path-tracer",
+  "version": "1.0.0",
+  "description": "a demo for movable camera and path tracing",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "lqt0223",
+  "license": "ISC",
+  "dependencies": {}
+}
