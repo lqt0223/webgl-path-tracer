@@ -37,6 +37,7 @@ function createShaderProgram(gl, vsSource, fsSource) {
   gl.compileShader(vs);
 
   if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+    // eslint-disable-next-line
     console.error('An error occurred compiling the vertex shaders: ' + gl.getShaderInfoLog(vs));
     gl.deleteShader(vs);
     return null;
@@ -47,6 +48,7 @@ function createShaderProgram(gl, vsSource, fsSource) {
   gl.compileShader(fs);
 
   if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+    // eslint-disable-next-line
     console.error('An error occurred compiling the fragment shaders: ' + gl.getShaderInfoLog(fs));
     gl.deleteShader(fs);
     return null;
