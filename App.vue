@@ -176,19 +176,24 @@ export default {
         const vec3 sc5 = vec3(0.8,0.5,-3.5);
         const float sr5 = 0.15;
 
-        vec3 random3d(vec3 v) {
-          return vec3(
-            fract(sin(dot(v, vec3(12.9898, 73.233, 131.7182)) * 3758.5453)),
-            fract(sin(dot(v, vec3(12.9898, 73.233, 131.7182)) * 3158.5453)),
-            fract(sin(dot(v, vec3(12.9898, 73.233, 131.7182)) * 2258.5453))
-          );
+        // code from https://github.com/evanw/webgl-path-tracing/blob/master/webgl-path-tracing.js
+        float random(vec3 scale, float seed) {
+          return fract(sin(dot(gl_FragCoord.xyz + seed, scale)) * 43758.5453 + seed);
         }
 
-        vec2 random2d(vec2 v) {
-          return vec2(
-            fract(sin(dot(v, vec2(124.9898, 73.233)) * 43758.5453)),
-            fract(sin(dot(v, vec2(124.9898, 73.233)) * 41758.5453))
-          );
+        vec3 cosineWeightedDirection(float seed, vec3 normal) {
+          float u = random(vec3(12.9898, 78.233, 151.7182), seed);
+          float v = random(vec3(63.7264, 10.873, 623.6736), seed);
+          float r = sqrt(u);
+          float angle = 6.283185307179586 * v;
+          vec3 sdir, tdir;
+          if (abs(normal.x)<.5) {
+            sdir = cross(normal, vec3(1,0,0));
+          } else {
+            sdir = cross(normal, vec3(0,1,0));
+          }
+          tdir = cross(normal, sdir);
+          return r*cos(angle)*sdir + r*sin(angle)*tdir + sqrt(1.-u)*normal;
         }
 
         // the function for ray-sphere intersection, given the origin and direction of a ray and the center and radius of a sphere
@@ -212,18 +217,21 @@ export default {
         // the function for resolving color on a specific hit point
         // currently returns only the diffuse color
         vec3 calc_color(vec3 hit, vec3 normal, vec3 diff_c) {
-          return diff_c;
-        }
+          vec3 light = vec3(0.8,0.5,-3.5);
+          vec3 l = normalize(light - hit);
+          float diff = dot(l, normal);
 
-        // the deviation intensity for the reflected light direction on a diffusive surface
-        const float disp = 2.0;
+          vec3 v = normalize(u_camera_pos - hit);
+          float spec = dot(v, reflect(-l, normal));
+          return pow(max(diff, 0.), 4.) + pow(max(spec,0.), 32.) + diff_c;
+        }
 
         vec4 trace(vec3 ro, vec3 rd) {
           vec3 color_mask = vec3(1.);
           vec3 accu_color = vec3(1.);
 
           // the path tracing depth
-          for (int i = 0; i < 3; i++) {
+          for (int i = 0; i < 5; i++) {
             // finding the nearest hit point by checking intersection with every spheres
             float dist = 10000.0;
             float d0 = sphere_hit(ro, rd,sc0, sr0);
@@ -231,17 +239,16 @@ export default {
             float d2 = sphere_hit(ro, rd,sc2, sr2);
             float d3 = sphere_hit(ro, rd,sc3, sr3);
             float d4 = sphere_hit(ro, rd,sc4, sr4);
-            float d5 = sphere_hit(ro, rd,sc5, sr5);
 
             if (dist > d0) dist = d0;
             if (dist > d1) dist = d1;
             if (dist > d2) dist = d2;
             if (dist > d3) dist = d3;
             if (dist > d4) dist = d4;
-            if (dist > d5) dist = d5;
 
             vec3 hit = ro + dist * rd;
             vec3 normal;
+            vec3 diffuse;
 
             if (dist == 10000.0) {
               break;
@@ -249,62 +256,26 @@ export default {
             // and find a randomly scattered ray from the hit point as new ray
             // for the next loop of path tracing
             } else if (dist == d0) {
-              vec3 diffuse = vec3(1.,0.3,0.3);
+              diffuse = vec3(1.,0.3,0.3);
               normal = normalize(hit - sc0);
-              color_mask *=(diffuse);
-              vec3 offset = disp*random3d(hit) - (disp/2.);
-              rd = normalize(normal + offset);
-
-              accu_color *= calc_color(hit, normal, color_mask);
-              ro = hit + 0.001 * normal;
             } else if (dist == d1) {
-              vec3 diffuse = vec3(1.,1.,1.);
+              diffuse = vec3(1.,1.,1.);
               normal = normalize(hit - sc1);
-              color_mask *=(diffuse);
-              vec3 offset = disp*random3d(hit) - (disp/2.);
-              rd = normalize(normal + offset);
-
-              accu_color *= calc_color(hit, normal, color_mask);
-              ro = hit + 0.001 * normal;
             } else if (dist == d2) {
-              vec3 diffuse = vec3(0.3,0.3,1.);
+              diffuse = vec3(0.3,0.3,1.);
               normal = normalize(hit - sc2);
-              color_mask *=(diffuse);
-              vec3 offset = disp*random3d(hit) - (disp/2.);
-              rd = normalize(normal + offset);
-
-              accu_color *= calc_color(hit, normal, color_mask);
-              ro = hit + 0.001 * normal;
             } else if (dist == d3) {
-              vec3 diffuse = vec3(0.2,0.4,0.4);
+              diffuse = vec3(0.2,0.4,0.4);
               normal = normalize(hit - sc3);
-              color_mask *=(diffuse);
-              vec3 offset = disp*random3d(hit) - (disp/2.);
-              rd = normalize(normal + offset);
-
-              accu_color *= calc_color(hit, normal, color_mask);
-              ro = hit + 0.001 * normal;
             } else if (dist == d4) {
-              vec3 diffuse = vec3(0.3,0.2,0.1);
+              diffuse = vec3(0.3,0.2,0.1);
               normal = normalize(hit - sc4);
-              color_mask *=(diffuse);
-              vec3 offset = disp*random3d(hit) - (disp/2.);
-              rd = normalize(normal + offset);
-
-              accu_color *= calc_color(hit, normal, color_mask);
-              ro = hit + 0.001 * normal;
-            // light
-            } else if (dist == d5) {
-              // the light sphere has a overexposed color
-              vec3 diffuse = vec3(20.);
-              normal = normalize(hit - sc5);
-              color_mask *= diffuse;
-              vec3 offset = disp*random3d(hit) - (disp/2.);
-              rd = normalize(normal + offset);
-
-              accu_color *= calc_color(hit, normal, color_mask);
-              ro = hit + 0.001 * normal;
             }
+            color_mask *= diffuse;
+            rd = cosineWeightedDirection(u_time+float(i), normal);
+
+            accu_color *= calc_color(hit, normal, color_mask);
+            ro = hit;
           }
           return vec4(accu_color, 1.);
         }
@@ -347,11 +318,6 @@ export default {
           vec4 str = vec4(st,1.);
           str = view * str;
 
-          const float sample_disp = 0.005;
-
-          // for each pixel, the path tracing result is based on a series of
-          // results where the ray direction is slightly varied
-          str.xy += sample_disp*random2d(vec2(sin(u_time))) - (sample_disp/2.);
           vec3 rd = normalize(str.xyz - u_camera_pos);
           vec3 ro = u_camera_pos;
           vec4 result = trace(ro, rd);
