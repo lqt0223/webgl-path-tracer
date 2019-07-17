@@ -162,40 +162,68 @@ export default {
         uniform float u_sw;
         uniform sampler2D tex;
 
-        const vec3 sc0 = vec3(-0.8,0.,-4.);
-        const float sr0 = 0.4;
-        const vec3 sc1 = vec3(0.,0.,-4.);
-        const float sr1 = 0.4;
-        const vec3 sc2 = vec3(0.8,0.,-4.);
-        const float sr2 = 0.4;
-        // sky (a big sphere at the back of the scene)
-        const vec3 sc3 = vec3(0.,0.,-104.4);
-        const float sr3 = 100.0;
-        // ground (a big sphere at the bottom of the scene)
-        const vec3 sc4 = vec3(0.,-100.4,-4.);
-        const float sr4 = 100.0;
-        // light (a sphere with an intentially overflowed color (brighter than vec3(1.,1.,1.)))
-        const vec3 sc5 = vec3(0.8,0.5,-3.5);
-        const float sr5 = 0.15;
+        // sphere center
+        const vec3 sc0 = vec3(-0.8,-0.5,-4.);
+        // sphere radius
+        const float sr0 = 0.5;
+        // sphere diffuse color
+        const vec3 sd0 = vec3(1.,0.3,0.3);
 
-        // code from https://github.com/evanw/webgl-path-tracing/blob/master/webgl-path-tracing.js
-        float random(vec3 scale, float seed) {
-          return fract(sin(dot(gl_FragCoord.xyz + seed, scale)) * 43758.5453 + seed);
+        const vec3 sc1 = vec3(0.8,-0.5,-4.);
+        const float sr1 = 0.5;
+        const vec3 sd1 = vec3(0.84,0.55,0.15);
+
+
+        const vec3 sc2 = vec3(0.0,-0.4,-3.);
+        const float sr2 = 0.6;
+        const vec3 sd2 = vec3(1.,1.,1.);
+
+
+        // sky (a big sphere at the back of the scene)
+        const vec3 sc3 = vec3(0.,-0.5,-115.4);
+        const float sr3 = 100.0;
+        const vec3 sd3 = vec3(0.2,0.4,0.4);
+
+
+        // ground (a big sphere at the bottom of the scene)
+        const vec3 sc4 = vec3(0.,-101.,-4.);
+        const float sr4 = 100.0;
+        const vec3 sd4 = vec3(0.3,0.2,0.1);
+
+
+        float random(vec2 scale, float seed) {
+          return fract(sin(dot(gl_FragCoord.xy + seed, scale)) * 43758.5453);
         }
 
         vec3 cosineWeightedDirection(float seed, vec3 normal) {
-          float u = random(vec3(12.9898, 78.233, 151.7182), seed);
-          float v = random(vec3(63.7264, 10.873, 623.6736), seed);
-          float r = sqrt(u);
-          float angle = 6.283185307179586 * v;
-          vec3 sdir, tdir;
-          if (abs(normal.x)<.5) {
-            sdir = cross(normal, vec3(1,0,0));
-          } else {
-            sdir = cross(normal, vec3(0,1,0));
-          }
-          tdir = cross(normal, sdir);
-          return r*cos(angle)*sdir + r*sin(angle)*tdir + sqrt(1.-u)*normal;
+          float u = random(vec2(12.9898, 78.233), seed);
+          float v = random(vec2(63.7264, 10.873), seed);
+
+          float theta = 6.28 * u;
+          float r = sqrt(1. - v);
+          float x = r * cos(theta);
+          float y = sqrt(v);
+          float z = r * sin(theta);
+
+          vec3 right = normalize(cross(normal, vec3(0.1)));
+          vec3 front = normalize(cross(right, normal));
+          return right * x + normal * y + front * z;
+        }
+
+        vec3 customWeightedDirection(float seed, vec3 normal) {
+          float u = random(vec2(12.9898, 78.233), seed);
+          float v = random(vec2(63.7264, 10.873), seed);
+
+          float theta = 6.28 * u;
+          float k = pow(v, 0.0001);
+          float r = sqrt(1. - k*k);
+          float x = r * cos(theta);
+          float y = k;
+          float z = r * sin(theta);
+
+          vec3 right = normalize(cross(normal, vec3(0.1)));
+          vec3 front = normalize(cross(right, normal));
+          return right * x + normal * y + front * z;
         }
 
         // the function for ray-sphere intersection, given the origin and direction of a ray and the center and radius of a sphere
@@ -219,13 +247,33 @@ export default {
         // the function for resolving color on a specific hit point
         // currently returns only the diffuse color
         vec3 calc_color(vec3 hit, vec3 normal, vec3 diff_c) {
-          vec3 light = vec3(0.8,0.5,-3.5);
+          vec3 light = vec3(2.8,2.5,1.5);
           vec3 l = normalize(light - hit);
           float diff = dot(l, normal);
 
           vec3 v = normalize(u_camera_pos - hit);
           float spec = dot(v, reflect(-l, normal));
           return pow(max(diff, 0.), 4.) + pow(max(spec,0.), 32.) + diff_c;
+        }
+
+        vec3 refr(vec3 ray, vec3 normal, float ri) {
+          float dt = dot(ray, normal);
+          float ni_over_nt;
+          vec3 n;
+          if (dt > 0.) {
+            n = -normal;
+            ni_over_nt = ri;
+          } else {
+            n = normal;
+            ni_over_nt = 1./ri;
+          }
+
+          float discriminant = 1. - ni_over_nt*ni_over_nt*(1. - dt*dt);
+          if (discriminant > 0.) {
+            return ri*(ray - n*dt)-n*sqrt(discriminant);
+          } else {
+            return reflect(ray, normal);
+          }
         }
 
         vec4 trace(vec3 ro, vec3 rd) {
@@ -258,26 +306,33 @@ export default {
             // and find a randomly scattered ray from the hit point as new ray
             // for the next loop of path tracing
             } else if (dist == d0) {
-              diffuse = vec3(1.,0.3,0.3);
+              diffuse = sd0;
               normal = normalize(hit - sc0);
             } else if (dist == d1) {
-              diffuse = vec3(1.,1.,1.);
+              diffuse = sd1;
               normal = normalize(hit - sc1);
             } else if (dist == d2) {
-              diffuse = vec3(0.3,0.3,1.);
+              diffuse = sd2;
               normal = normalize(hit - sc2);
             } else if (dist == d3) {
-              diffuse = vec3(0.2,0.4,0.4);
+              diffuse = sd3;
               normal = normalize(hit - sc3);
             } else if (dist == d4) {
-              diffuse = vec3(0.3,0.2,0.1);
+              diffuse = sd4;
               normal = normalize(hit - sc4);
             }
             color_mask *= diffuse;
-            rd = cosineWeightedDirection(u_time+float(i), normal);
+
+            if (dist == d0) {
+              rd = customWeightedDirection(u_time, reflect(rd, normal));
+            } else if (dist == d2) {
+              rd = customWeightedDirection(u_time,refr(rd, normal, 1.2));
+            } else {
+              rd = cosineWeightedDirection(u_time, normal);
+            }
 
             accu_color *= calc_color(hit, normal, color_mask);
-            ro = hit;
+            ro = hit - 0.001 * normal;
           }
           return vec4(accu_color, 1.);
         }
