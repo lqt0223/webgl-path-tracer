@@ -162,6 +162,13 @@ export default {
         uniform float u_sw;
         uniform sampler2D tex;
 
+        // cube min vertx
+        const vec3 cmin0 = vec3(-0.2,-1.0,-1.);
+        // cube max vertx
+        const vec3 cmax0 = vec3(0.2,-0.6,-0.6);
+        // cube diffuse color
+        const vec3 cd0 = vec3(0.52);
+
         // sphere center
         const vec3 sc0 = vec3(-0.8,-0.5,-4.);
         // sphere radius
@@ -174,8 +181,8 @@ export default {
         const vec3 sd1 = vec3(0.84,0.55,0.15);
 
 
-        const vec3 sc2 = vec3(0.0,-0.4,-3.);
-        const float sr2 = 0.6;
+        const vec3 sc2 = vec3(0.0,-0.7,-3.);
+        const float sr2 = 0.3;
         const vec3 sd2 = vec3(1.,1.,1.);
 
 
@@ -244,6 +251,20 @@ export default {
           return 10000.0;
         }
 
+        // the function for axis-aligned ray-box intersection
+        vec2 box_hit(vec3 ro, vec3 rd, vec3 box_min, vec3 box_max) {
+          vec3 tmin = (box_min - ro) / rd;
+          vec3 tmax = (box_max - ro) / rd;
+
+          vec3 t1 = min(tmin, tmax);
+          vec3 t2 = max(tmin, tmax);
+
+          float tnear = max(max(t1.x, t1.y), t1.z);
+          float tfar = min(min(t2.x, t2.y), t2.z);
+
+          return vec2(tnear, tfar);
+        }
+
         // the function for resolving color on a specific hit point
         // currently returns only the diffuse color
         vec3 calc_color(vec3 hit, vec3 normal, vec3 diff_c) {
@@ -276,6 +297,17 @@ export default {
           }
         }
 
+        vec3 box_normal(vec3 hit, vec3 box_min, vec3 box_max) {
+          if (hit.x < box_min.x + 0.001) return vec3(-1,0,0);
+          else if (hit.x > box_max.x - 0.001) return vec3(1,0,0);
+
+          else if (hit.y < box_min.y + 0.001) return vec3(0,-1,0);
+          else if (hit.y > box_max.y - 0.001) return vec3(0,1,0);
+
+          else if (hit.z < box_min.z + 0.001) return vec3(0,0,-1);
+          return vec3(0,0,1);
+        }
+
         vec4 trace(vec3 ro, vec3 rd) {
           vec3 color_mask = vec3(1.);
           vec3 accu_color = vec3(1.);
@@ -284,12 +316,17 @@ export default {
           for (int i = 0; i < 5; i++) {
             // finding the nearest hit point by checking intersection with every spheres
             float dist = 10000.0;
+            vec2 dc0 = box_hit(ro, rd, cmin0, cmax0);
             float d0 = sphere_hit(ro, rd,sc0, sr0);
             float d1 = sphere_hit(ro, rd,sc1, sr1);
             float d2 = sphere_hit(ro, rd,sc2, sr2);
             float d3 = sphere_hit(ro, rd,sc3, sr3);
             float d4 = sphere_hit(ro, rd,sc4, sr4);
 
+            vec3 normal;
+            vec3 diffuse;
+
+            if (dc0.x > 0. && dc0.x < dc0.y && dist > dc0.x) dist = dc0.x;
             if (dist > d0) dist = d0;
             if (dist > d1) dist = d1;
             if (dist > d2) dist = d2;
@@ -297,14 +334,15 @@ export default {
             if (dist > d4) dist = d4;
 
             vec3 hit = ro + dist * rd;
-            vec3 normal;
-            vec3 diffuse;
 
             if (dist == 10000.0) {
               break;
             // if any sphere is hit, accumulate the color on the sphere,
             // and find a randomly scattered ray from the hit point as new ray
             // for the next loop of path tracing
+            } else if (dist == dc0.x) {
+              diffuse = cd0;
+              normal = box_normal(hit, cmin0, cmax0);
             } else if (dist == d0) {
               diffuse = sd0;
               normal = normalize(hit - sc0);
@@ -321,18 +359,18 @@ export default {
               diffuse = sd4;
               normal = normalize(hit - sc4);
             }
-            color_mask *= diffuse;
 
-            if (dist == d0) {
+            if (dist == dc0.x) {
+              rd = customWeightedDirection(u_time, refr(rd, normal, 1.2));
+            } else if (dist == d0) {
               rd = customWeightedDirection(u_time, reflect(rd, normal));
-            } else if (dist == d2) {
-              rd = customWeightedDirection(u_time,refr(rd, normal, 1.2));
             } else {
               rd = cosineWeightedDirection(u_time, normal);
             }
 
+            color_mask *= diffuse;
             accu_color *= calc_color(hit, normal, color_mask);
-            ro = hit - 0.001 * normal;
+            ro = hit - 0.0001 * normal;
           }
           return vec4(accu_color, 1.);
         }
@@ -357,25 +395,9 @@ export default {
           vec3 r = normalize(cross(v,up));
           vec3 u = normalize(cross(v,r));
           
-          mat4 basis = mat4(
-            r.x,r.y,r.z,0.,
-            u.x,u.y,u.z,0.,
-            v.x,v.y,v.z,0.,
-            0.,0.,0.,1.
-          );
+          vec3 str = st.x * r + st.y * u + st.z * v + screen_origin;
 
-          mat4 translate = mat4(
-            1.,0.,0.,0.,
-            0.,1.,0.,0.,
-            0.,0.,1.,0.,
-            screen_origin.x,screen_origin.y,screen_origin.z,1.
-          );
-
-          mat4 view = translate * basis;
-          vec4 str = vec4(st,1.);
-          str = view * str;
-
-          vec3 rd = normalize(str.xyz - u_camera_pos);
+          vec3 rd = normalize(str - u_camera_pos);
           vec3 ro = u_camera_pos;
           vec4 result = trace(ro, rd);
           
