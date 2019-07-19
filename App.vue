@@ -23,9 +23,7 @@ const planeVertices = [
   -1,-1,
   1,-1,
   -1,1,
-  1,1,
-  -1,1,
-  1,-1
+  1,1
 ];
 
 function createShaderProgram(gl, vsSource, fsSource) {
@@ -153,7 +151,6 @@ export default {
       `,
       `
         precision highp float;
-        uniform vec2 u_resolution;
         uniform vec2 u_mouse;
         uniform vec3 u_camera_pos;
         uniform vec3 u_camera_dir;
@@ -213,7 +210,7 @@ export default {
           float z = r * sin(theta);
 
           vec3 right = normalize(cross(normal, vec3(0.1)));
-          vec3 front = normalize(cross(right, normal));
+          vec3 front = cross(right, normal);
           return right * x + normal * y + front * z;
         }
 
@@ -229,7 +226,7 @@ export default {
           float z = r * sin(theta);
 
           vec3 right = normalize(cross(normal, vec3(0.1)));
-          vec3 front = normalize(cross(right, normal));
+          vec3 front = cross(right, normal);
           return right * x + normal * y + front * z;
         }
 
@@ -345,19 +342,19 @@ export default {
               normal = box_normal(hit, cmin0, cmax0);
             } else if (dist == d0) {
               diffuse = sd0;
-              normal = normalize(hit - sc0);
+              normal = (hit - sc0) / sr0;
             } else if (dist == d1) {
               diffuse = sd1;
-              normal = normalize(hit - sc1);
+              normal = (hit - sc1) / sr1;
             } else if (dist == d2) {
               diffuse = sd2;
-              normal = normalize(hit - sc2);
+              normal = (hit - sc2) / sr2;
             } else if (dist == d3) {
               diffuse = sd3;
-              normal = normalize(hit - sc3);
+              normal = (hit - sc3) / sr3;
             } else if (dist == d4) {
               diffuse = sd4;
-              normal = normalize(hit - sc4);
+              normal = (hit - sc4) / sr4;
             }
 
             if (dist == dc0.x) {
@@ -382,7 +379,6 @@ export default {
           // first assuming that there is a screen that lies in the world-space with its center at (0,0,0)
           // and the plane of screen is parallel to the xy plane
           vec3 st = vec3(vPosition.xy, 0.);
-          st.x = st.x * u_resolution.x / u_resolution.y;
           st.y = -st.y;
 
           // then, convert the screen to world-space where a camera position and direction is determined
@@ -390,10 +386,10 @@ export default {
           // first change the basis, then translate to the world-space
 
           vec3 screen_origin = u_camera_pos + screen_dist * u_camera_dir;
-          vec3 v = normalize(u_camera_dir);
+          vec3 v = u_camera_dir;
           vec3 up = vec3(0.,1.,0.);
-          vec3 r = normalize(cross(v,up));
-          vec3 u = normalize(cross(v,r));
+          vec3 r = normalize(cross(v,vec3(0.,1.,0.)));
+          vec3 u = cross(v,r);
           
           vec3 str = st.x * r + st.y * u + st.z * v + screen_origin;
 
@@ -402,9 +398,7 @@ export default {
           vec4 result = trace(ro, rd);
           
           // gamma correction
-          result.x = sqrt(result.x);
-          result.y = sqrt(result.y);
-          result.z = sqrt(result.z);
+          result = sqrt(result);
           // progressive rendering, where the results is accumulated with previous frame render result
           // u_sw is a value that approximates 1
           // thus the new frame will contribute less to the final image as time elapses
@@ -417,7 +411,6 @@ export default {
     // draw call
     let time = 0;
     let then = 0;
-    let w = this.w, h = this.h;
 
     let self = this;
     function draw(now) {
@@ -453,10 +446,6 @@ export default {
       let mul = gl.getUniformLocation(tracerProgram, 'u_mouse');
       gl.uniform2f(mul, self.mouse.x, self.mouse.y);
 
-      // resolution uniform
-      let rul = gl.getUniformLocation(tracerProgram, 'u_resolution');
-      gl.uniform2f(rul, w, h);
-
       // camera pos uniform
       let cpul = gl.getUniformLocation(tracerProgram, 'u_camera_pos');
       gl.uniform3f(cpul, self.cameraPos.x, self.cameraPos.y, self.cameraPos.z);
@@ -469,7 +458,7 @@ export default {
       gl.bindTexture(gl.TEXTURE_2D, textures[0]);
       gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, textures[1], 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
       textures.reverse();
@@ -483,7 +472,7 @@ export default {
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
       gl.enableVertexAttribArray(0);
       gl.bindAttribLocation(tracerProgram, 0, 'aPosition');
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       window.requestAnimationFrame((timestamp) => draw(timestamp));
     }
