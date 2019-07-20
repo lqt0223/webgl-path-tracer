@@ -368,8 +368,8 @@ export default {
       `
     );
 
-    const planeVao = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, planeVao);
+    const planeBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, planeBuffer);
     const planeData = new Float32Array(planeVertices);
     gl.bufferData(gl.ARRAY_BUFFER, planeData, gl.STATIC_DRAW);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
@@ -402,7 +402,7 @@ export default {
 
       gl.clearColor(0,0,0,0);
 
-      gl.bindBuffer(gl.ARRAY_BUFFER, planeVao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, planeBuffer);
 
       // tracer, render to texture
       gl.useProgram(tracerProgram);
