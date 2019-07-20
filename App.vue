@@ -98,23 +98,6 @@ export default {
 
     const gl = document.querySelector('#cvs').getContext('webgl');
 
-    const planeVao = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, planeVao);
-    const planeData = new Float32Array(planeVertices);
-    gl.bufferData(gl.ARRAY_BUFFER, planeData, gl.STATIC_DRAW);
-
-    // In order to implement progressive rendering
-    // 2 textures as image storing, and one framebuffer for drawing rendered result to texture are needed
-    const textures = [];
-    for (var i = 0; i < 2; i++) {
-      textures.push(gl.createTexture());
-      gl.bindTexture(gl.TEXTURE_2D, textures[i]);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.w, this.h, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-    }
-
-    const fb = gl.createFramebuffer();
 
     // the vertex and fragment shader for rendering a stored render result to viewport
     const renderProgram = createShaderProgram(gl,
@@ -408,6 +391,27 @@ export default {
       `
     );
 
+    const planeVao = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, planeVao);
+    const planeData = new Float32Array(planeVertices);
+    gl.bufferData(gl.ARRAY_BUFFER, planeData, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+    gl.enableVertexAttribArray(0);
+    gl.bindAttribLocation(tracerProgram, 0, 'aPosition');
+
+    // In order to implement progressive rendering
+    // 2 textures as image storing, and one framebuffer for drawing rendered result to texture are needed
+    const textures = [];
+    for (var i = 0; i < 2; i++) {
+      textures.push(gl.createTexture());
+      gl.bindTexture(gl.TEXTURE_2D, textures[i]);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.w, this.h, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+    }
+
+    const fb = gl.createFramebuffer();
+
     // draw call
     let time = 0;
     let then = 0;
@@ -424,13 +428,7 @@ export default {
       gl.bindBuffer(gl.ARRAY_BUFFER, planeVao);
 
       // tracer, render to texture
-      gl.linkProgram(tracerProgram);
       gl.useProgram(tracerProgram);
-
-      // position attrib
-      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
-      gl.enableVertexAttribArray(0);
-      gl.bindAttribLocation(tracerProgram, 0, 'aPosition');
 
       time+=deltaTime;
       self.sampleCount++;
@@ -466,12 +464,7 @@ export default {
       // render to canvas
       gl.useProgram(renderProgram);
 
-      gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-
       // position attrib
-      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
-      gl.enableVertexAttribArray(0);
-      gl.bindAttribLocation(tracerProgram, 0, 'aPosition');
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       window.requestAnimationFrame((timestamp) => draw(timestamp));
