@@ -2,17 +2,15 @@
   <div id="app">
     <canvas id="cvs" :width="w" :height="h" @touchstart.prevent @touchmove="handleTouchMove" @mousemove="handleMouseMove"></canvas>
     <h2>A demo for movable camera and path tracing</h2>
-    <p>How to play on PC or Mac</p>
-    <ul>
-      <li>move mouse inside to look around</li>
-      <li>use WSAD key to walk around</li>
-    </ul>
-
-    <p>How to play on mobile devices</p>
-    <ul>
-      <li>touch and move inside to look around</li>
-      <li>use two-finger gesture inside to walk around</li>
-    </ul>
+    <span>Select a camera mode: </span>
+    <input type="radio" id="free" value="free" v-model="cameraMode">
+    <label for="free">free</label>
+    <input type="radio" id="focus" value="focus" v-model="cameraMode">
+    <label for="focus">focus</label>
+    <p>TIP: On PC or Mac, use F to toggle camera mode</p>
+    <p>
+      <button @click="showHowToPlay">How to play?</button>
+    </p>
   </div>
 </template>
 
@@ -62,6 +60,7 @@ function createShaderProgram(gl, vsSource, fsSource) {
 export default {
   data() {
     return {
+      cameraMode: 'focus',
       w: 512,
       h: 512,
       mouse: {
@@ -72,6 +71,7 @@ export default {
         left: 0,
         top: 0
       },
+      screenDist: 6,
       cameraPos: {
         x: 0,
         y: 0,
@@ -83,6 +83,11 @@ export default {
         x: 0,
         y: 0,
         z: -1
+      },
+      screenOrigin: {
+        x: 0,
+        y: 0,
+        z: 0
       },
       sampleCount: 0
     }
@@ -432,9 +437,28 @@ export default {
     window.requestAnimationFrame((timestamp) => draw(timestamp));
   },
   methods: {
-    getScreenToWorldMatrix() {
-      const screenDist = 6;
+    showHowToPlay() {
+      if (this.cameraMode === 'free') {
+        alert(`
+      How to play on PC or Mac
+        1. move mouse inside to look around
+        2. use WSAD key to walk around
 
+      How to play on mobile devices
+        1. touch and move inside to look around
+        2. use two-finger gesture inside to walk around
+        `);
+      } else {
+        alert(`
+      How to play on PC or Mac
+        1. move mouse inside to rotate camera around the origin
+
+      How to play on mobile devices
+        1. touch inside to rotate camera around the origin
+        `);
+      }
+    },
+    getScreenToWorldMatrix() {
       let v = [
         this.cameraDir.x,
         this.cameraDir.y,
@@ -459,7 +483,7 @@ export default {
         r[0],r[1],r[2],0.0,
         u[0],u[1],u[2],0.0,
         v[0],v[1],v[2],0.0,
-        screenDist*v[0],screenDist*v[1],screenDist*v[2],1.0
+        this.screenDist*v[0],this.screenDist*v[1],this.screenDist*v[2],1.0
       ]);
       return result;
     },
@@ -494,26 +518,56 @@ export default {
       const speed = 0.1;
       if (key === 'w') {
         this.sampleCount = 0;
-        this.cameraPos.x += speed * this.cameraDir.x;
-        this.cameraPos.y += speed * this.cameraDir.y;
-        this.cameraPos.z += speed * this.cameraDir.z;
+        if (this.cameraMode === 'free') {
+          this.cameraPos.x += speed * this.cameraDir.x;
+          this.cameraPos.y += speed * this.cameraDir.y;
+          this.cameraPos.z += speed * this.cameraDir.z;
+
+          this.screenOrigin.x = this.cameraPos.x + this.screenDist * this.cameraDir.x;
+          this.screenOrigin.y = this.cameraPos.y + this.screenDist * this.cameraDir.y;
+          this.screenOrigin.z = this.cameraPos.z + this.screenDist * this.cameraDir.z;
+        }
       } else if (key === 's') {
         this.sampleCount = 0;
-        this.cameraPos.x -= speed * this.cameraDir.x;
-        this.cameraPos.y -= speed * this.cameraDir.y;
-        this.cameraPos.z -= speed * this.cameraDir.z;
+        if (this.cameraMode === 'free') {
+          this.cameraPos.x -= speed * this.cameraDir.x;
+          this.cameraPos.y -= speed * this.cameraDir.y;
+          this.cameraPos.z -= speed * this.cameraDir.z;
+
+          this.screenOrigin.x = this.cameraPos.x + this.screenDist * this.cameraDir.x;
+          this.screenOrigin.y = this.cameraPos.y + this.screenDist * this.cameraDir.y;
+          this.screenOrigin.z = this.cameraPos.z + this.screenDist * this.cameraDir.z;
+        }
       } else if (key === 'a') {
-        this.sampleCount = 0;
-        const r = this.crossProduct(this.cameraDir.x, this.cameraDir.y, this.cameraDir.z, 0,1,0);
-        this.cameraPos.x -= speed * r[0];
-        this.cameraPos.y -= speed * r[1];
-        this.cameraPos.z -= speed * r[2];
+        if (this.cameraMode === 'free') {
+          this.sampleCount = 0;
+          const r = this.crossProduct(this.cameraDir.x, this.cameraDir.y, this.cameraDir.z, 0,1,0);
+          this.cameraPos.x -= speed * r[0];
+          this.cameraPos.y -= speed * r[1];
+          this.cameraPos.z -= speed * r[2];
+
+          this.screenOrigin.x = this.cameraPos.x + this.screenDist * this.cameraDir.x;
+          this.screenOrigin.y = this.cameraPos.y + this.screenDist * this.cameraDir.y;
+          this.screenOrigin.z = this.cameraPos.z + this.screenDist * this.cameraDir.z;
+        }
       } else if (key === 'd') {
-        this.sampleCount = 0;
-        const r = this.crossProduct(this.cameraDir.x, this.cameraDir.y, this.cameraDir.z, 0,1,0);
-        this.cameraPos.x += speed * r[0];
-        this.cameraPos.y += speed * r[1];
-        this.cameraPos.z += speed * r[2];
+        if (this.cameraMode === 'free') {
+          this.sampleCount = 0;
+          const r = this.crossProduct(this.cameraDir.x, this.cameraDir.y, this.cameraDir.z, 0,1,0);
+          this.cameraPos.x += speed * r[0];
+          this.cameraPos.y += speed * r[1];
+          this.cameraPos.z += speed * r[2];
+
+          this.screenOrigin.x = this.cameraPos.x + this.screenDist * this.cameraDir.x;
+          this.screenOrigin.y = this.cameraPos.y + this.screenDist * this.cameraDir.y;
+          this.screenOrigin.z = this.cameraPos.z + this.screenDist * this.cameraDir.z;
+        }
+      } else if (key === 'f') {
+        if (this.cameraMode === 'free') {
+          this.cameraMode = 'focus';
+        } else {
+          this.cameraMode = 'free';
+        }
       }
     },
     handleMouseMove(e) {
@@ -538,6 +592,16 @@ export default {
       this.cameraDir.z = -Math.cos(this.cameraDir.pitch) * Math.cos(this.cameraDir.yaw);
       this.cameraDir.y = Math.sin(this.cameraDir.pitch);
       this.cameraDir.x = Math.cos(this.cameraDir.pitch) * Math.sin(this.cameraDir.yaw);
+
+      if (this.cameraMode === 'focus') {
+        this.cameraPos.x = this.screenOrigin.x - this.screenDist * this.cameraDir.x;
+        this.cameraPos.y = this.screenOrigin.y - this.screenDist * this.cameraDir.y;
+        this.cameraPos.z = this.screenOrigin.z - this.screenDist * this.cameraDir.z;
+      } else {
+        this.screenOrigin.x = this.cameraPos.x + this.screenDist * this.cameraDir.x;
+        this.screenOrigin.y = this.cameraPos.y + this.screenDist * this.cameraDir.y;
+        this.screenOrigin.z = this.cameraPos.z + this.screenDist * this.cameraDir.z;
+      }
     },
     handleTouchMove(e) {
       e.preventDefault();
@@ -548,22 +612,35 @@ export default {
 
       y = -y;
 
-      if (e.touches.length === 2) {
-        this.handleLeftRight(-0.05*x);
-        this.handleForwardBackward(0.05*y);
+      if (this.cameraMode === 'free') {
+        if (e.touches.length === 2) {
+          this.handleLeftRight(-0.05*x);
+          this.handleForwardBackward(0.05*y);
+        } else {
+          x *= 360;
+          x = this.degToRad(x);
+
+          y *= 180;
+          y = this.degToRad(y);
+
+          this.cameraDir.pitch += 0.002*y;
+          this.cameraDir.yaw += 0.002*x;
+
+          this.cameraDir.z = -Math.cos(this.cameraDir.pitch) * Math.cos(this.cameraDir.yaw);
+          this.cameraDir.y = Math.sin(this.cameraDir.pitch);
+          this.cameraDir.x = Math.cos(this.cameraDir.pitch) * Math.sin(this.cameraDir.yaw);
+        }
       } else {
-        x *= 360;
-        x = this.degToRad(x);
-
-        y *= 180;
-        y = this.degToRad(y);
-
-        this.cameraDir.pitch += 0.002*y;
-        this.cameraDir.yaw += 0.002*x;
-
+        this.cameraDir.pitch += 0.02*y;
+        this.cameraDir.yaw += 0.02*x;
+        
         this.cameraDir.z = -Math.cos(this.cameraDir.pitch) * Math.cos(this.cameraDir.yaw);
         this.cameraDir.y = Math.sin(this.cameraDir.pitch);
         this.cameraDir.x = Math.cos(this.cameraDir.pitch) * Math.sin(this.cameraDir.yaw);
+
+        this.cameraPos.x = this.screenOrigin.x - this.screenDist * this.cameraDir.x;
+        this.cameraPos.y = this.screenOrigin.y - this.screenDist * this.cameraDir.y;
+        this.cameraPos.z = this.screenOrigin.z - this.screenDist * this.cameraDir.z;
       }
     }
   }
@@ -573,7 +650,6 @@ export default {
 <style>
 body {
   margin: 0;
-  overflow: hidden;
   user-select: none;
 }
 #app {
