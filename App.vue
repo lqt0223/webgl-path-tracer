@@ -98,29 +98,6 @@ export default {
 
     const gl = document.querySelector('#cvs').getContext('webgl');
 
-
-    // the vertex and fragment shader for rendering a stored render result to viewport
-    const renderProgram = createShaderProgram(gl,
-      `
-        attribute vec4 aPosition;
-        varying vec2 texCoord;
-
-        void main() {
-          texCoord = aPosition.xy * 0.5 + 0.5;
-          gl_Position = aPosition;
-        }
-      `,
-      `
-        precision highp float;
-        varying vec2 texCoord;
-        uniform sampler2D tex;
-
-        void main() {
-          gl_FragColor = texture2D(tex, texCoord);
-        }
-      `
-    );
-
     // the vertex and fragment shader for the actual path tracing
     const tracerProgram = createShaderProgram(gl,
       `
@@ -462,7 +439,6 @@ export default {
       textures.reverse();
 
       // render to canvas
-      gl.useProgram(renderProgram);
 
       // position attrib
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
