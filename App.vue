@@ -111,12 +111,11 @@ export default {
       `,
       `
         precision highp float;
-        uniform vec2 u_mouse;
         uniform vec3 u_camera_pos;
-        uniform vec3 u_camera_dir;
         varying vec4 vPosition;
         uniform float u_time;
         uniform float u_sw;
+        uniform mat4 u_screen_to_world;
         uniform sampler2D tex;
 
         // cube min vertx
@@ -338,24 +337,15 @@ export default {
           // s,t is the x,y axis of the screen-space coordinate,
           // first assuming that there is a screen that lies in the world-space with its center at (0,0,0)
           // and the plane of screen is parallel to the xy plane
-          vec3 st = vec3(vPosition.xy, 0.);
+          vec4 st = vec4(vPosition.xy, 0., 1.);
           st.y = -st.y;
 
           // then, convert the screen to world-space where a camera position and direction is determined
           // this is done by an inverse matrix operation of gluLookAt
           // first change the basis, then translate to the world-space
 
-          vec3 screen_origin = u_camera_pos + screen_dist * u_camera_dir;
-          vec3 v = u_camera_dir;
-          vec3 up = vec3(0.,1.,0.);
-          vec3 r = normalize(cross(v,vec3(0.,1.,0.)));
-          vec3 u = cross(v,r);
-          
-          vec3 str = st.x * r + st.y * u + st.z * v + screen_origin;
-
-          vec3 rd = normalize(str - u_camera_pos);
-          vec3 ro = u_camera_pos;
-          vec4 result = trace(ro, rd);
+          vec4 rd = u_screen_to_world * st;
+          vec4 result = trace(u_camera_pos, rd.xyz);
           
           // gamma correction
           result = sqrt(result);
@@ -389,6 +379,8 @@ export default {
 
     const fb = gl.createFramebuffer();
 
+    gl.useProgram(tracerProgram);
+
     // draw call
     let time = 0;
     let then = 0;
@@ -404,9 +396,6 @@ export default {
 
       gl.bindBuffer(gl.ARRAY_BUFFER, planeBuffer);
 
-      // tracer, render to texture
-      gl.useProgram(tracerProgram);
-
       time+=deltaTime;
       self.sampleCount++;
       // time uniform
@@ -417,17 +406,14 @@ export default {
       let swul = gl.getUniformLocation(tracerProgram, 'u_sw');
       gl.uniform1f(swul, self.sampleCount / (self.sampleCount + 1));
 
-      // mouse uniform
-      let mul = gl.getUniformLocation(tracerProgram, 'u_mouse');
-      gl.uniform2f(mul, self.mouse.x, self.mouse.y);
-
       // camera pos uniform
       let cpul = gl.getUniformLocation(tracerProgram, 'u_camera_pos');
       gl.uniform3f(cpul, self.cameraPos.x, self.cameraPos.y, self.cameraPos.z);
 
-      // camera dir uniform
-      let cdul = gl.getUniformLocation(tracerProgram, 'u_camera_dir');
-      gl.uniform3f(cdul, self.cameraDir.x, self.cameraDir.y, self.cameraDir.z);
+      // screen to world matrix uniform
+      const screenToWorldMatrix = self.getScreenToWorldMatrix();
+      let swmul = gl.getUniformLocation(tracerProgram, 'u_screen_to_world');
+      gl.uniformMatrix4fv(swmul, false, screenToWorldMatrix);
 
       // for progressive rendering, two textures are alteratively used to store the current path trace result
       gl.bindTexture(gl.TEXTURE_2D, textures[0]);
@@ -439,8 +425,6 @@ export default {
       textures.reverse();
 
       // render to canvas
-
-      // position attrib
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       window.requestAnimationFrame((timestamp) => draw(timestamp));
@@ -448,11 +432,46 @@ export default {
     window.requestAnimationFrame((timestamp) => draw(timestamp));
   },
   methods: {
+    getScreenToWorldMatrix() {
+      const screenDist = 6;
+
+      let v = [
+        this.cameraDir.x,
+        this.cameraDir.y,
+        this.cameraDir.z
+      ];
+
+      const up = [0.0,1.0,0.0];
+
+      let r = this.crossProduct(
+        v[0],v[1],v[2],
+        up[0],up[1],up[2]
+      );
+
+      r = this.normalize(...r);
+
+      let u = this.crossProduct(
+        v[0],v[1],v[2],
+        r[0],r[1],r[2]
+      );
+
+      const result = new Float32Array([
+        r[0],r[1],r[2],0.0,
+        u[0],u[1],u[2],0.0,
+        v[0],v[1],v[2],0.0,
+        screenDist*v[0],screenDist*v[1],screenDist*v[2],1.0
+      ]);
+      return result;
+    },
+    normalize(x,y,z) {
+      const len = Math.sqrt(x*x+y*y+z*z);
+      return [ x/len, y/len, z/len ];
+    },
     // methods for implementing the movable camera
     crossProduct(x1,y1,z1,x2,y2,z2) {
       return [
         y1*z2-z1*y2,
-        z1*x2-x1*x2,
+        z1*x2-x1*z2,
         x1*y2-y1*x2
       ];
     },
