@@ -147,16 +147,13 @@ export default {
         const vec3 sd2 = vec3(1.,1.,1.);
 
 
-        // sky (a big sphere at the back of the scene)
-        const vec3 sc3 = vec3(0.,-0.5,-115.4);
-        const float sr3 = 100.0;
-        const vec3 sd3 = vec3(0.2,0.4,0.4);
+        // sky (a infinite plane at the back of the scene)
+        const float pz = -6.5;
+        const vec3 pzd = vec3(1.,0.5,0.5);
 
-
-        // ground (a big sphere at the bottom of the scene)
-        const vec3 sc4 = vec3(0.,-101.,-4.);
-        const float sr4 = 100.0;
-        const vec3 sd4 = vec3(0.3,0.2,0.1);
+        // ground (a infinite plane at the bottom of the scene)
+        const float py = -1.;
+        const vec3 pyd = vec3(0.78,0.95,0.84);
 
 
         float random(vec2 scale, float seed) {
@@ -226,6 +223,16 @@ export default {
           return vec2(tnear, tfar);
         }
 
+        // the function for a z-axis perpendicular plane and ray intersection
+        float z_plane_hit(vec3 ro, vec3 rd, float z) {
+          return (z - ro.z) / rd.z;
+        }
+
+        // the function for a y-axis perpendicular plane and ray intersection
+        float y_plane_hit(vec3 ro, vec3 rd, float y) {
+          return (y - ro.y) / rd.y;
+        }
+
         // the function for resolving color on a specific hit point
         // currently returns only the diffuse color
         vec3 calc_color(vec3 hit, vec3 normal, vec3 diff_c) {
@@ -281,8 +288,8 @@ export default {
             float d0 = sphere_hit(ro, rd,sc0, sr0);
             float d1 = sphere_hit(ro, rd,sc1, sr1);
             float d2 = sphere_hit(ro, rd,sc2, sr2);
-            float d3 = sphere_hit(ro, rd,sc3, sr3);
-            float d4 = sphere_hit(ro, rd,sc4, sr4);
+            float d3 = z_plane_hit(ro, rd, pz);
+            float d4 = y_plane_hit(ro, rd, py);
 
             vec3 normal;
             vec3 diffuse;
@@ -291,8 +298,8 @@ export default {
             if (dist > d0) dist = d0;
             if (dist > d1) dist = d1;
             if (dist > d2) dist = d2;
-            if (dist > d3) dist = d3;
-            if (dist > d4) dist = d4;
+            if (d3 > 0. && dist > d3) dist = d3;
+            if (d4 > 0. && dist > d4) dist = d4;
 
             vec3 hit = ro + dist * rd;
 
@@ -314,24 +321,26 @@ export default {
               diffuse = sd2;
               normal = (hit - sc2) / sr2;
             } else if (dist == d3) {
-              diffuse = sd3;
-              normal = (hit - sc3) / sr3;
+              diffuse = pzd;
+              normal = vec3(0.,0.,-1.);
             } else if (dist == d4) {
-              diffuse = sd4;
-              normal = (hit - sc4) / sr4;
+              diffuse = pyd;
+              normal = vec3(0.,1.,0.);
             }
 
             if (dist == dc0.x) {
               rd = customWeightedDirection(u_time, refr(rd, normal, 1.2));
+              ro = hit - 0.0001 * normal;
             } else if (dist == d0) {
               rd = customWeightedDirection(u_time, reflect(rd, normal));
+              ro = hit + 0.0001 * normal;
             } else {
               rd = cosineWeightedDirection(u_time, normal);
+              ro = hit + 0.0001 * normal;
             }
 
             color_mask *= diffuse;
             accu_color *= calc_color(hit, normal, color_mask);
-            ro = hit - 0.0001 * normal;
           }
           return vec4(accu_color, 1.);
         }
