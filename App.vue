@@ -490,23 +490,26 @@ export default {
       this.cameraPos.z += speed * this.cameraDir.z;
     },
     handleKeyPress(e) {
-      this.sampleCount = 0;
       const key = e.key;
       const speed = 0.1;
       if (key === 'w') {
+        this.sampleCount = 0;
         this.cameraPos.x += speed * this.cameraDir.x;
         this.cameraPos.y += speed * this.cameraDir.y;
         this.cameraPos.z += speed * this.cameraDir.z;
       } else if (key === 's') {
+        this.sampleCount = 0;
         this.cameraPos.x -= speed * this.cameraDir.x;
         this.cameraPos.y -= speed * this.cameraDir.y;
         this.cameraPos.z -= speed * this.cameraDir.z;
       } else if (key === 'a') {
+        this.sampleCount = 0;
         const r = this.crossProduct(this.cameraDir.x, this.cameraDir.y, this.cameraDir.z, 0,1,0);
         this.cameraPos.x -= speed * r[0];
         this.cameraPos.y -= speed * r[1];
         this.cameraPos.z -= speed * r[2];
       } else if (key === 'd') {
+        this.sampleCount = 0;
         const r = this.crossProduct(this.cameraDir.x, this.cameraDir.y, this.cameraDir.z, 0,1,0);
         this.cameraPos.x += speed * r[0];
         this.cameraPos.y += speed * r[1];
