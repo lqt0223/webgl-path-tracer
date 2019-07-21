@@ -124,28 +124,18 @@ export default {
         uniform sampler2D tex;
 
         // cube min vertx
-        const vec3 cmin0 = vec3(-0.2,-1.0,-1.);
+        const vec3 cmin0 = vec3(-0.2,-1.0,-4.);
         // cube max vertx
-        const vec3 cmax0 = vec3(0.2,-0.6,-0.6);
+        const vec3 cmax0 = vec3(0.2,-0.6,-3.6);
         // cube diffuse color
-        const vec3 cd0 = vec3(0.52);
+        const vec3 cd0 = vec3(0.9);
 
         // sphere center
-        const vec3 sc0 = vec3(-0.8,-0.5,-4.);
+        const vec3 sc0 = vec3(-0.8,-0.7,-4.);
         // sphere radius
-        const float sr0 = 0.5;
+        const float sr0 = 0.3;
         // sphere diffuse color
-        const vec3 sd0 = vec3(1.,0.3,0.3);
-
-        const vec3 sc1 = vec3(0.8,-0.5,-4.);
-        const float sr1 = 0.5;
-        const vec3 sd1 = vec3(0.84,0.55,0.15);
-
-
-        const vec3 sc2 = vec3(0.0,-0.7,-3.);
-        const float sr2 = 0.3;
-        const vec3 sd2 = vec3(1.,1.,1.);
-
+        const vec3 sd0 = vec3(0.9);
 
         // sky (a infinite plane at the back of the scene)
         const float pz = -6.5;
@@ -286,8 +276,6 @@ export default {
             float dist = 10000.0;
             vec2 dc0 = box_hit(ro, rd, cmin0, cmax0);
             float d0 = sphere_hit(ro, rd,sc0, sr0);
-            float d1 = sphere_hit(ro, rd,sc1, sr1);
-            float d2 = sphere_hit(ro, rd,sc2, sr2);
             float d3 = z_plane_hit(ro, rd, pz);
             float d4 = y_plane_hit(ro, rd, py);
 
@@ -296,8 +284,6 @@ export default {
 
             if (dc0.x > 0. && dc0.x < dc0.y && dist > dc0.x) dist = dc0.x;
             if (dist > d0) dist = d0;
-            if (dist > d1) dist = d1;
-            if (dist > d2) dist = d2;
             if (d3 > 0. && dist > d3) dist = d3;
             if (d4 > 0. && dist > d4) dist = d4;
 
@@ -314,12 +300,6 @@ export default {
             } else if (dist == d0) {
               diffuse = sd0;
               normal = (hit - sc0) / sr0;
-            } else if (dist == d1) {
-              diffuse = sd1;
-              normal = (hit - sc1) / sr1;
-            } else if (dist == d2) {
-              diffuse = sd2;
-              normal = (hit - sc2) / sr2;
             } else if (dist == d3) {
               diffuse = pzd;
               normal = vec3(0.,0.,-1.);
@@ -328,15 +308,12 @@ export default {
               normal = vec3(0.,1.,0.);
             }
 
-            if (dist == dc0.x) {
-              rd = customWeightedDirection(u_time, refr(rd, normal, 1.2));
-              ro = hit - 0.0001 * normal;
-            } else if (dist == d0) {
-              rd = customWeightedDirection(u_time, reflect(rd, normal));
-              ro = hit + 0.0001 * normal;
-            } else {
+            if (dist == d3 || dist == d4) {
               rd = cosineWeightedDirection(u_time, normal);
               ro = hit + 0.0001 * normal;
+            } else {
+              rd = customWeightedDirection(u_time, reflect(rd, normal));
+              ro = hit - 0.0001 * normal;
             }
 
             color_mask *= diffuse;
