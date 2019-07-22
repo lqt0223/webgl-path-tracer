@@ -124,18 +124,25 @@ export default {
         uniform sampler2D tex;
 
         // cube min vertx
-        const vec3 cmin0 = vec3(-0.2,-1.0,-4.);
+        const vec3 cmin0 = vec3(-0.2,-1.0,-4.2);
         // cube max vertx
-        const vec3 cmax0 = vec3(0.2,-0.6,-3.6);
+        const vec3 cmax0 = vec3(0.2,-0.6,-3.8);
         // cube diffuse color
         const vec3 cd0 = vec3(0.9);
 
         // sphere center
-        const vec3 sc0 = vec3(-0.8,-0.7,-4.);
+        const vec3 sc0 = vec3(-0.8,-0.8,-4.);
         // sphere radius
-        const float sr0 = 0.3;
+        const float sr0 = 0.2;
         // sphere diffuse color
         const vec3 sd0 = vec3(0.9);
+
+        // cylinder center
+        const vec3 cc0 = vec3(0.8, -0.7, -4.0);
+        // cylinder height
+        const float ch0 = 0.3;
+        // cylinder radius
+        const float cr0 = 0.3;
 
         // sky (a infinite plane at the back of the scene)
         const float pz = -6.5;
@@ -223,6 +230,45 @@ export default {
           return (y - ro.y) / rd.y;
         }
 
+        // the function for a y-axis perpendicular disk (circle shaped plane) and ray intersection
+        float y_disk_hit(vec3 ro, vec3 rd, vec3 center, float r) {
+          float t = y_plane_hit(ro, rd, center.y);
+          if (t > 0.) {
+            vec3 hit = ro + t * rd;
+            if (length(center - hit) < r) {
+              return t;
+            }
+          }
+          return 10000.0;
+        }
+
+        // the function for ray-cylinder intersection
+        float cylinder_hit(vec3 ro, vec3 rd, vec3 center, float h, float r, out int face) {
+          vec2 oc = (ro - center).xz;
+          vec2 rd2 = rd.xz;
+          float a = dot(rd2, rd2);
+          float b = 2.0 * dot(oc, rd2);
+          float c = dot(oc, oc) - r * r;
+          float discriminant = b * b - 4.0 * a * c;
+          float top = center.y + h;
+          float bottom = center.y - h;
+
+          float temp = (- b - sqrt(discriminant)) / (2.0 * a);
+          vec3 hit = ro + temp * rd;
+          if (temp > 0. && hit.y < top && hit.y > bottom) {
+            face = 0;
+            return temp;
+          } else if (hit.y > top) {
+            face = 1;
+            return y_disk_hit(ro, rd, center + vec3(0.,h,0.), r);
+          } else {
+            face = 2;
+            return y_disk_hit(ro, rd, center + vec3(0.,-h, 0.), r);
+          }
+
+          return 10000.0;
+        }
+
         // the function for resolving color on a specific hit point
         // currently returns only the diffuse color
         vec3 calc_color(vec3 hit, vec3 normal, vec3 diff_c) {
@@ -270,12 +316,15 @@ export default {
           vec3 color_mask = vec3(1.);
           vec3 accu_color = vec3(1.);
 
+          int cylinder_face = -1;
+
           // the path tracing depth
           for (int i = 0; i < 5; i++) {
             // finding the nearest hit point by checking intersection with every spheres
             float dist = 10000.0;
             vec2 dc0 = box_hit(ro, rd, cmin0, cmax0);
             float d0 = sphere_hit(ro, rd,sc0, sr0);
+            float d1 = cylinder_hit(ro, rd, cc0, ch0, cr0, cylinder_face);
             float d3 = z_plane_hit(ro, rd, pz);
             float d4 = y_plane_hit(ro, rd, py);
 
@@ -284,6 +333,7 @@ export default {
 
             if (dc0.x > 0. && dc0.x < dc0.y && dist > dc0.x) dist = dc0.x;
             if (dist > d0) dist = d0;
+            if (d1 > 0. && dist > d1) dist = d1;
             if (d3 > 0. && dist > d3) dist = d3;
             if (d4 > 0. && dist > d4) dist = d4;
 
@@ -300,6 +350,16 @@ export default {
             } else if (dist == d0) {
               diffuse = sd0;
               normal = (hit - sc0) / sr0;
+            } else if (dist == d1) {
+              diffuse = sd0;
+              if (cylinder_face == 0) {
+                vec3 n = (hit - vec3(cc0.x, 0., cc0.z)) / cr0;
+                normal = vec3(n.x, 0., n.z);
+              } else if (cylinder_face == 1) {
+                normal = vec3(0,1,0);
+              } else {
+                normal = vec3(0,-1,0);
+              }
             } else if (dist == d3) {
               diffuse = pzd;
               normal = vec3(0.,0.,-1.);
