@@ -144,6 +144,14 @@ export default {
         // cylinder radius
         const float cr0 = 0.3;
 
+        // y_triangle y value
+        const float ty0 = -0.95;
+
+        // y_triangle vertices
+        const vec2 tv00 = vec2(-0.5,-2.866);
+        const vec2 tv01 = vec2(0.5,-2.866);
+        const vec2 tv02 = vec2(0.,-2.);
+
         // sky (a infinite plane at the back of the scene)
         const float pz = -6.5;
         const vec3 pzd = vec3(1.,0.5,0.5);
@@ -269,6 +277,31 @@ export default {
           return 10000.0;
         }
 
+        float det2x2(vec2 va, vec2 vb) {
+          return (va.x * vb.y) - (vb.x * va.y);
+        }
+
+        bool in_triangle(vec2 p, vec2 v1, vec2 v2, vec2 v3) {
+          float d1 = det2x2(v2 - v1,p - v1);
+          float d2 = det2x2(v3 - v2,p - v2);
+          float d3 = det2x2(v1 - v3,p - v3);
+
+          return (
+            (d1 < 0. && d2 < 0. && d3 < 0.) ||
+            (d1 > 0. && d2 > 0. && d3 > 0.)
+          );
+        }
+
+        // the function for a y-axis perpendicula triangle and ray intersection
+        float y_triangle_hit(vec3 ro, vec3 rd, float y, vec2 v1, vec2 v2, vec2 v3) {
+          float t = y_plane_hit(ro, rd, y);
+          vec3 hit = ro + t * rd;
+          if (in_triangle(hit.xz, v1, v2, v3)) {
+            return t;
+          }
+          return 10000.0;
+        }
+
         // the function for resolving color on a specific hit point
         // currently returns only the diffuse color
         vec3 calc_color(vec3 hit, vec3 normal, vec3 diff_c) {
@@ -325,6 +358,7 @@ export default {
             vec2 dc0 = box_hit(ro, rd, cmin0, cmax0);
             float d0 = sphere_hit(ro, rd,sc0, sr0);
             float d1 = cylinder_hit(ro, rd, cc0, ch0, cr0, cylinder_face);
+            float d2 = y_triangle_hit(ro, rd, ty0, tv00, tv01, tv02);
             float d3 = z_plane_hit(ro, rd, pz);
             float d4 = y_plane_hit(ro, rd, py);
 
@@ -334,6 +368,7 @@ export default {
             if (dc0.x > 0. && dc0.x < dc0.y && dist > dc0.x) dist = dc0.x;
             if (dist > d0) dist = d0;
             if (d1 > 0. && dist > d1) dist = d1;
+            if (d2 > 0. && dist > d2) dist = d2;
             if (d3 > 0. && dist > d3) dist = d3;
             if (d4 > 0. && dist > d4) dist = d4;
 
@@ -360,6 +395,9 @@ export default {
               } else {
                 normal = vec3(0,-1,0);
               }
+            } else if (dist == d2) {
+              diffuse = sd0;
+              normal = vec3(0,1,0);
             } else if (dist == d3) {
               diffuse = pzd;
               normal = vec3(0.,0.,-1.);
@@ -370,11 +408,10 @@ export default {
 
             if (dist == d3 || dist == d4) {
               rd = cosineWeightedDirection(u_time, normal);
-              ro = hit + 0.0001 * normal;
             } else {
               rd = customWeightedDirection(u_time, reflect(rd, normal));
-              ro = hit - 0.0001 * normal;
             }
+            ro = hit + 0.0001 * normal;
 
             color_mask *= diffuse;
             accu_color *= calc_color(hit, normal, color_mask);
