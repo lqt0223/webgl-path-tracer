@@ -124,9 +124,11 @@ export default {
         uniform sampler2D tex;
 
         // cube min vertx
-        const vec3 cmin0 = vec3(-0.2,-1.0,-4.2);
+        const vec3 cmin0 = vec3(-0.2,-0.8,-4.2);
         // cube max vertx
-        const vec3 cmax0 = vec3(0.2,-0.6,-3.8);
+        const vec3 cmax0 = vec3(0.2,-0.4,-3.8);
+        // cube center
+        const vec3 ccenter = (cmin0 + cmax0) / 2.;
         // cube diffuse color
         const vec3 cd0 = vec3(0.9);
 
@@ -160,6 +162,49 @@ export default {
         const float py = -1.;
         const vec3 pyd = vec3(0.78,0.95,0.84);
 
+        mat4 rot = mat4(
+          1.,0.,0.,0.,
+          0.,1.,0.,0.,
+          0.,0.,1.,0.,
+          ccenter.x,ccenter.y,ccenter.z, 1.
+        ) * mat4(
+          cos(0.707), 0.,sin(0.707),0.,
+          0.,1.,0.,0.,
+          -sin(0.707), 0.,cos(0.707),0.,
+          0.,0.,0.,1.
+        ) * mat4(
+          1.,0.,0.,0.,
+          0.,cos(0.207),sin(0.207),0.,
+          0.,-sin(0.207),cos(0.207),0.,
+          0.,0.,0.,1.
+        ) * mat4(
+          1.,0.,0.,0.,
+          0.,1.,0.,0.,
+          0.,0.,1.,0.,
+          -ccenter.x,-ccenter.y,-ccenter.z,1.
+        );
+
+        mat4 invrot = mat4(
+          1.,0.,0.,0.,
+          0.,1.,0.,0.,
+          0.,0.,1.,0.,
+          ccenter.x,ccenter.y,ccenter.z, 1.
+        ) * mat4(
+          1.,0.,0.,0.,
+          0.,cos(-0.207),sin(-0.207),0.,
+          0.,-sin(-0.207),cos(-0.207),0.,
+          0.,0.,0.,1.
+        ) * mat4(
+          cos(-0.707), 0.,sin(-0.707),0.,
+          0.,1.,0.,0.,
+          -sin(-0.707), 0.,cos(-0.707),0.,
+          0.,0.,0.,1.
+        ) * mat4(
+          1.,0.,0.,0.,
+          0.,1.,0.,0.,
+          0.,0.,1.,0.,
+          -ccenter.x,-ccenter.y,-ccenter.z, 1.
+        );
 
         float random(vec2 scale, float seed) {
           return fract(sin(dot(gl_FragCoord.xy + seed, scale)) * 43758.5453);
@@ -355,7 +400,9 @@ export default {
           for (int i = 0; i < 5; i++) {
             // finding the nearest hit point by checking intersection with every spheres
             float dist = 10000.0;
-            vec2 dc0 = box_hit(ro, rd, cmin0, cmax0);
+            vec3 rco = (rot * vec4(ro, 1.)).xyz;
+            vec3 rcd = (rot * vec4(rd, 0.)).xyz;
+            vec2 dc0 = box_hit(rco, rcd, cmin0, cmax0);
             float d0 = sphere_hit(ro, rd,sc0, sr0);
             float d1 = cylinder_hit(ro, rd, cc0, ch0, cr0, cylinder_face);
             float d2 = y_triangle_hit(ro, rd, ty0, tv00, tv01, tv02);
@@ -381,7 +428,8 @@ export default {
             // for the next loop of path tracing
             } else if (dist == dc0.x) {
               diffuse = cd0;
-              normal = box_normal(hit, cmin0, cmax0);
+              normal = box_normal((rot * vec4(hit, 1.)).xyz, cmin0, cmax0);
+              normal = (invrot * vec4(normal, 0.)).xyz;
             } else if (dist == d0) {
               diffuse = sd0;
               normal = (hit - sc0) / sr0;
